@@ -1,0 +1,24 @@
+name: Validate TEST source
+on:
+  push:
+    branches: [main, 'test/**']
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check manifest and source files
+        run: |
+          python3 - <<'PY'
+          import json,pathlib
+          manifest=json.loads(pathlib.Path('appsscript.json').read_text(encoding='utf-8-sig'))
+          assert manifest['runtimeVersion']=='V8'
+          assert manifest['webapp']['access']=='DOMAIN'
+          assert pathlib.Path('Code.gs').exists()
+          assert pathlib.Path('Index.html').exists()
+          assert 'BUILD test-scaffold-0.1' in pathlib.Path('Index.html').read_text()
+          print('TEST source checks passed')
+          PY
