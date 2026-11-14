@@ -19,6 +19,6 @@ jobs:
           assert manifest['webapp']['access']=='DOMAIN'
           assert pathlib.Path('Code.gs').exists()
           assert pathlib.Path('Index.html').exists()
-          assert 'BUILD test-scaffold-0.1' in pathlib.Path('Index.html').read_text()
+          assert 'BUILD test-demo-0.3' in pathlib.Path('Index.html').read_text()
           print('TEST source checks passed')
           PY
