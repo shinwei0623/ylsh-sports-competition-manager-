@@ -1,0 +1,40 @@
+✔ full isolated API flow: create, submit, approve, check-in, draw, schedule, result, public read (15.606247ms)
+✔ public competition DTO omits private contact, email, student identity and request ID (3.471125ms)
+✔ anonymous bootstrap never matches legacy records with blank owner (3.242013ms)
+✔ bootstrap limits settings and check-in rows to current user (2.693074ms)
+✔ scoped event manager cannot edit another event or create global events (3.49024ms)
+✔ scoped manager model filters registrations, members, audit and assignments (6.398989ms)
+✔ class manager sees only assigned class and cannot grant roles (2.691342ms)
+✔ unprivileged caller cannot run schema installer (1.846323ms)
+✔ registration idempotency is checked after acquiring the write lock (1.962593ms)
+✔ request ID collision cannot return another user registration (2.221458ms)
+✔ retries reuse the original record and do not duplicate members (2.250264ms)
+✔ registration rejects closed, future, expired or malformed dates (6.633288ms)
+✔ registration capacity and member limits are enforced (3.590745ms)
+✔ foreign or closed category is rejected (1.844381ms)
+✔ duplicate student IDs rejected within one team and across active entries (2.858117ms)
+✔ pending, cancelled and rejected registrations cannot check in or enter a draw (7.513099ms)
+✔ check-in role cannot check another event or save results (2.827213ms)
+✔ draw locks writes and prevents regeneration (2.589026ms)
+✔ draft competition, provisional results and private results metadata stay hidden (4.154082ms)
+✔ match and result relations cannot refer to another event or same opponent (2.885126ms)
+✔ cannot reparent another managers existing category or match (2.886839ms)
+✔ event edit preserves capacity and scoring fields absent from the form (2.38815ms)
+✔ invalid event IDs, roles, dates and ranges fail closed (2.498839ms)
+✔ checked-in registrations cannot be cancelled or silently reset (2.353559ms)
+✔ Taipei datetime-local input is independent of test host timezone (2.174285ms)
+✔ frontends compile; every google.script.run API exists; navigation and print output render safely (27.625288ms)
+✔ event and match creation requests are idempotent without schema migration (1.976614ms)
+✔ registration retry repairs member-write failure before returning success (4.150855ms)
+✔ registration recovery refuses changed request contents (3.091ms)
+✔ check-in retry reconciles parent after second-sheet failure (3.918121ms)
+✔ draw retry resumes persisted plan and keeps category groups separate (2.436451ms)
+✔ blank student IDs are rejected and draft match/score fields stay private (2.482884ms)
+ℹ tests 32
+ℹ suites 0
+ℹ pass 32
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 328.46569

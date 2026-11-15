@@ -1,0 +1,6 @@
+.clasp.json
+.clasprc.json
+node_modules/
+tests/baseline.gs
+tests/patch-source.py
+tests/finalize-source.py

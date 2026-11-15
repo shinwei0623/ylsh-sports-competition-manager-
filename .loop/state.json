@@ -1,0 +1,17 @@
+{
+  "task": "sports-integrated-sync-20261116",
+  "timezone": "Asia/Taipei",
+  "primary_modifier": "codex-root",
+  "knowledge_sha": "27beab92a661615b0d4d05238c3ff2d20deeb16c",
+  "source_base_sha": "a2d2f33671c7bd00d98665aa6d3ce8031e779df1",
+  "branch": "test/integrated-sync-acceptance-20261116",
+  "source_recovery": "PASS; four immutable GAS version-3 files match snapshot",
+  "build": "INTEGRATED-2.0.1-test",
+  "isolated_local_acceptance": "PASS; see docs/test-output.txt",
+  "independent_review": "PENDING exact candidate commit review",
+  "real_gas_test_deployment": "NOT_EXECUTED",
+  "live_data_changes": false,
+  "existing_site_deployment": "NOT_EXECUTED; scoped user approval required",
+  "oauth_automatic_deployment": "PAUSED_BY_USER",
+  "next": "independent review, submit Draft PR, then isolated Google-runtime acceptance"
+}

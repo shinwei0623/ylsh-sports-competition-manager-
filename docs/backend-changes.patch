@@ -1,0 +1,285 @@
+diff --git a/tests/baseline.gs b/gas/integrated/Code.gs
+index b178916..dc8e52c 100644
+--- a/tests/baseline.gs
++++ b/gas/integrated/Code.gs
+@@ -1,4 +1,4 @@
+-const BUILD = 'INTEGRATED-2.0.0';
++const BUILD = 'INTEGRATED-2.0.1-test';
+ const DB_PROP = 'SPREADSHEET_ID';
+ const ADMIN_PROP = 'ADMIN_EMAIL';
+ const SHEMAS = {
+@@ -69,12 +69,14 @@ function actor_(){
+     table_('RoleAssignments').rows.filter(r=>clean_(r.email).toLowerCase()===email&&clean_(r.status||'ACTIVE')==='ACTIVE')
+       .forEach(r=>roles.push({role:r.role,scopeType:r.scopeType,scopeId:r.scopeId}));
+   }
+-  return {email:email,displayName:email?email.split('@')[0]:'訪客',roles:roles,isAdmin:roles.some(r=>r.role==='SYSTEM_ADMIN')};
++  return {email:email,displayName:email?email.split('@')[0]:'訪客',roles:roles,isAdmin:roles.some(r=>r.role==='SYSTEM_ADMIN'&&r.scopeType==='SYSTEM'&&r.scopeId==='*')};
+ }
+ function requireRole_(allowed,scopeId){
+-  const a=actor_(); const ok=a.roles.some(r=>allowed.includes(r.role)&&(r.scopeId==='*'||!scopeId||r.scopeId===scopeId));
+-  if(!ok)throw new Error('沒有執行此操作的權限'); return a;
++  const a=actor_();
++  if(!a.email || !a.roles.some(r=>roleAllows_(r,allowed,scopeId)))throw new Error('沒有執行此操作的權限');
++  return a;
+ }
++
+ function canManageEvent_(eventId){return requireRole_(['SYSTEM_ADMIN','EVENT_ADMIN','CHECKIN'],eventId);}
+ function audit_(action,recordId,details,requestId,role){
+   const a=actor_(); append_('AuditLogs',{logId:uid_('LOG'),action:action,recordId:recordId,at:now_(),details:JSON.stringify(details||{}),actorEmail:a.email,role:role||'',requestId:requestId||''});
+@@ -87,7 +89,7 @@ function envelope_(fn){
+ 
+ function installOrUpgradeSystem(){
+   return envelope_(function(){
+-    const db=getDb_(); Object.keys(SHEMAS).forEach(name=>{
++    requireSystemAdmin_(); const db=getDb_(); Object.keys(SHEMAS).forEach(name=>{
+       let s=db.getSheetByName(name); if(!s)s=db.insertSheet(name);
+       const expected=SHEMAS[name], width=Math.max(s.getLastColumn(),1); let headers=s.getRange(1,1,1,width).getDisplayValues()[0].map(clean_);
+       expected.forEach(h=>{if(!headers.includes(h)){headers.push(h);s.getRange(1,headers.length).setValue(h);}});
+@@ -101,89 +103,205 @@ function installOrUpgradeSystem(){
+ 
+ function apiBootstrap(){
+   return envelope_(function(){
+-    const a=actor_(), settings=settingMap_(), events=table_('Events').rows.filter(r=>!['DELETED','DRAFT'].includes(r.status)), categories=table_('Categories').rows.filter(r=>r.status!=='DELETED');
+-    const regs=table_('Registrations').rows.filter(r=>clean_(r.registrantEmail).toLowerCase()===a.email);
+-    const checkins=table_('CheckIns').rows, results=table_('Results').rows;
+-    return {actor:a,settings:settings,events:events,categories:categories,registrations:regs,checkIns:checkins,results:results,counts:{events:events.length,openEvents:events.filter(e=>e.status==='OPEN').length,registrations:table_('Registrations').rows.length,checkedIn:checkins.filter(c=>c.status==='PRESENT').length}};
++    const a=actor_(),settings=publicSettings_(),events=table_('Events').rows.filter(publicEvent_),ids=new Set(events.map(e=>e.eventId));
++    const regs=a.email?table_('Registrations').rows.filter(r=>clean_(r.registrantEmail).toLowerCase()===a.email):[];
++    const own=new Set(regs.map(r=>r.registrationId));
++    const checkins=table_('CheckIns').rows.filter(c=>own.has(c.registrationId)).map(c=>pick_(c,['registrationId','eventId','status','checkedInAt']));
++    return {navigation:navigation_(),actor:a,settings:settings,events:events,categories:table_('Categories').rows.filter(c=>ids.has(c.eventId)&&c.status==='OPEN'),registrations:regs,checkIns:checkins,results:[],counts:{events:events.length,openEvents:events.filter(e=>e.status==='OPEN').length,registrations:regs.length,checkedIn:checkins.length}};
+   });
+ }
+ 
+ function apiSaveEvent(input){
+-  return envelope_(function(req){
+-    const a=requireRole_(['SYSTEM_ADMIN','EVENT_ADMIN']); input=input||{};
+-    if(!clean_(input.name))throw new Error('請輸入競賽名稱');
+-    const id=clean_(input.eventId)||uid_('EVT'), old=table_('Events').rows.find(r=>r.eventId===id), stamp=now_();
+-    const rec={eventId:id,name:clean_(input.name),category:clean_(input.category||'綜合'),status:clean_(input.status||'DRAFT'),capacity:Number(input.capacity||0),createdAt:old?old.createdAt:stamp,dataOrigin:old?old.dataOrigin:'SYSTEM',demoBatchId:old?old.demoBatchId:'',schoolId:clean_(input.schoolId||'YLSH'),eventType:clean_(input.eventType||'INDIVIDUAL'),gender:clean_(input.gender||'OPEN'),gradeGroup:clean_(input.gradeGroup||'ALL'),teamMin:Number(input.teamMin||1),teamMax:Number(input.teamMax||1),registrationOpenAt:clean_(input.registrationOpenAt),registrationCloseAt:clean_(input.registrationCloseAt),eventDate:clean_(input.eventDate),venue:clean_(input.venue),scoringRule:clean_(input.scoringRule),notes:clean_(input.notes),updatedAt:stamp};
++  return envelope_(function(req){ return withWriteLock_(function(){
++    input=input||{}; const a=requireRole_(['SYSTEM_ADMIN','EVENT_ADMIN'],clean_(input.eventId));
++    if(!clean_(input.name))throw new Error('請輸入競賽名稱'); validateEventInput_(input);
++    const id=clean_(input.eventId)||requestEntityId_('EVT',input.requestId), old=table_('Events').rows.find(r=>r.eventId===id), stamp=now_();
++    if(!input.eventId&&old)return old; input=Object.assign({},old||{},input); const rec={eventId:id,name:clean_(input.name),category:clean_(input.category||'綜合'),status:clean_(input.status||'DRAFT'),capacity:Number(input.capacity||0),createdAt:old?old.createdAt:stamp,dataOrigin:old?old.dataOrigin:'SYSTEM',demoBatchId:old?old.demoBatchId:'',schoolId:clean_(input.schoolId||'YLSH'),eventType:clean_(input.eventType||'INDIVIDUAL'),gender:clean_(input.gender||'OPEN'),gradeGroup:clean_(input.gradeGroup||'ALL'),teamMin:Number(input.teamMin||1),teamMax:Number(input.teamMax||1),registrationOpenAt:clean_(input.registrationOpenAt),registrationCloseAt:clean_(input.registrationCloseAt),eventDate:clean_(input.eventDate),venue:clean_(input.venue),scoringRule:clean_(input.scoringRule),notes:clean_(input.notes),updatedAt:stamp};
+     old?update_('Events','eventId',id,rec):append_('Events',rec); audit_('EVENT_SAVED',id,rec,req,a.roles[0].role); return rec;
+-  });
++  }); });
+ }
+ function apiSaveCategory(input){
+-  return envelope_(function(req){
+-    requireRole_(['SYSTEM_ADMIN','EVENT_ADMIN'],input.eventId); const stamp=now_(),id=clean_(input.categoryId)||uid_('CAT');
+-    const old=table_('Categories').rows.find(r=>r.categoryId===id); const rec={categoryId:id,eventId:clean_(input.eventId),name:clean_(input.name),eventType:clean_(input.eventType||'INDIVIDUAL'),gender:clean_(input.gender||'OPEN'),gradeGroup:clean_(input.gradeGroup||'ALL'),teamMin:Number(input.teamMin||1),teamMax:Number(input.teamMax||1),capacity:Number(input.capacity||0),status:clean_(input.status||'OPEN'),createdAt:old?old.createdAt:stamp,updatedAt:stamp};
+-    if(!rec.eventId||!rec.name)throw new Error('請選擇競賽並輸入組別名稱'); old?update_('Categories','categoryId',id,rec):append_('Categories',rec); audit_('CATEGORY_SAVED',id,rec,req); return rec;
+-  });
++  return envelope_(function(req){ return withWriteLock_(function(){
++    input=input||{}; requireRole_(['SYSTEM_ADMIN','EVENT_ADMIN'],input.eventId); assertEvent_(input.eventId); const stamp=now_(),id=clean_(input.categoryId)||uid_('CAT');
++    const old=table_('Categories').rows.find(r=>r.categoryId===id); if(old)requireRole_(['SYSTEM_ADMIN','EVENT_ADMIN'],old.eventId); const rec={categoryId:id,eventId:clean_(input.eventId),name:clean_(input.name),eventType:clean_(input.eventType||'INDIVIDUAL'),gender:clean_(input.gender||'OPEN'),gradeGroup:clean_(input.gradeGroup||'ALL'),teamMin:Number(input.teamMin||1),teamMax:Number(input.teamMax||1),capacity:Number(input.capacity||0),status:clean_(input.status||'OPEN'),createdAt:old?old.createdAt:stamp,updatedAt:stamp};
++    if(input.categoryId&&!validId_(input.categoryId))throw new Error('組別編號錯誤'); if(!rec.eventId||!rec.name)throw new Error('請選擇競賽並輸入組別名稱'); old?update_('Categories','categoryId',id,rec):append_('Categories',rec); audit_('CATEGORY_SAVED',id,rec,req); return rec;
++  }); });
+ }
+ 
+ function apiSubmitRegistration(input){
+-  return envelope_(function(req){
+-    input=input||{}; const a=actor_(); if(!a.email)throw new Error('請使用學校 Google 帳號登入');
+-    const event=table_('Events').rows.find(e=>e.eventId===input.eventId); if(!event)throw new Error('找不到競賽'); if(event.status!=='OPEN')throw new Error('本競賽目前未開放報名');
+-    const close=clean_(event.registrationCloseAt); if(close&&new Date(close).getTime()<Date.now())throw new Error('報名已截止');
+-    if(!clean_(input.requestId))throw new Error('缺少請求識別碼'); const dup=table_('Registrations').rows.find(r=>r.requestId===input.requestId); if(dup)return dup;
+-    const members=Array.isArray(input.members)?input.members.filter(m=>clean_(m.studentName)):[];
+-    if(!members.length&&clean_(input.studentName))members.push({studentName:input.studentName,className:input.className,seatNo:input.seatNo,studentId:input.studentId});
+-    const min=Math.max(1,Number(event.teamMin||1)),max=Math.max(min,Number(event.teamMax||1)); if(members.length<min||members.length>max)throw new Error('參賽人數須為 '+min+'–'+max+' 人');
+-    const id=uid_('REG'),stamp=now_(),rec={registrationId:id,eventId:event.eventId,className:clean_(input.className||members[0].className),seatNo:clean_(input.seatNo||members[0].seatNo),studentName:clean_(input.studentName||members[0].studentName),status:'REGISTERED',requestId:input.requestId,createdAt:stamp,dataOrigin:'USER',demoBatchId:'',schoolId:clean_(input.schoolId||event.schoolId||'YLSH'),categoryId:clean_(input.categoryId),registrantEmail:a.email,teamName:clean_(input.teamName),contactPhone:clean_(input.contactPhone),verifiedAt:stamp,updatedAt:stamp};
+-    const lock=LockService.getScriptLock();lock.waitLock(20000);try{append_('Registrations',rec);members.forEach((m,i)=>append_('RegistrationMembers',{memberId:uid_('MEM'),registrationId:id,playerId:clean_(m.playerId),studentId:clean_(m.studentId),className:clean_(m.className||rec.className),seatNo:clean_(m.seatNo),studentName:clean_(m.studentName),role:i===0?'CAPTAIN':'MEMBER',orderNo:i+1,createdAt:stamp}));}finally{lock.releaseLock();}
+-    audit_('REGISTRATION_CREATED',id,{eventId:event.eventId,members:members.length},input.requestId,'USER'); return rec;
+-  });
++  return envelope_(function(req){return withWriteLock_(function(){
++    input=input||{};const a=actor_();if(!a.email)throw new Error('請使用學校 Google 帳號登入');
++    if(!/^[a-zA-Z0-9_-]{8,100}$/.test(clean_(input.requestId)))throw new Error('缺少或無效請求識別碼');
++    const all=table_('Registrations').rows,dup=all.find(r=>r.requestId===input.requestId);
++    if(dup){if(clean_(dup.registrantEmail).toLowerCase()!==a.email||dup.eventId!==input.eventId)throw new Error('請求識別碼衝突');if(dup.status!=='SUBMITTING')return dup;}
++    const event=assertEvent_(input.eventId),category=input.categoryId?table_('Categories').rows.find(c=>c.categoryId===input.categoryId&&c.eventId===event.eventId&&c.status==='OPEN'):null;
++    if(input.categoryId&&!category)throw new Error('組別不屬於本競賽或未開放');
++    const members=(Array.isArray(input.members)?input.members:[]).map(m=>({studentName:clean_(m&&m.studentName),studentId:clean_(m&&m.studentId),className:clean_(m&&m.className||input.className),seatNo:clean_(m&&m.seatNo),playerId:clean_(m&&m.playerId)}));
++    const rule=category||event,min=Number(rule.teamMin||1),max=Number(rule.teamMax||min);
++    if(!Number.isInteger(min)||!Number.isInteger(max)||min<1||max<min||members.length<min||members.length>max)throw new Error('參賽人數不符合規定');
++    if(members.some(m=>!m.studentName||!m.studentId||!m.className))throw new Error('請填寫成員姓名、學號與班級');
++    const signature=payloadHash_({eventId:event.eventId,categoryId:clean_(input.categoryId),className:clean_(input.className),teamName:clean_(input.teamName),contactPhone:clean_(input.contactPhone),members:members});
++    const stamp=now_(),id=dup?dup.registrationId:uid_('REG');
++    let rec=dup;
++    if(dup){const plan=table_('AuditLogs').rows.find(l=>l.action==='REGISTRATION_STARTED'&&l.recordId===id);if(!plan||JSON.parse(plan.details).signature!==signature)throw new Error('重試內容不一致，請聯絡管理員');}
++    else{
++      if(event.status!=='OPEN')throw new Error('本競賽目前未開放報名');
++      const start=dateMs_(event.registrationOpenAt),end=dateMs_(event.registrationCloseAt);
++      if(start&&Date.now()<start)throw new Error('報名尚未開始');if(end&&Date.now()>=end)throw new Error('報名已截止');
++      const active=all.filter(r=>r.eventId===event.eventId&&!['CANCELLED','REJECTED','DISQUALIFIED'].includes(r.status));
++      if(Number(event.capacity)>0&&active.length>=Number(event.capacity))throw new Error('競賽名額已滿');
++      if(category&&Number(category.capacity)>0&&active.filter(r=>r.categoryId===category.categoryId).length>=Number(category.capacity))throw new Error('組別名額已滿');
++      if(active.some(r=>r.status==='SUBMITTING'))throw new Error('有報名正在復原，請稍後重試或聯絡管理員'); const ids=members.map(m=>m.studentId);if(new Set(ids).size!==ids.length)throw new Error('同一報名有重複學號');
++      const activeIds=new Set(active.map(r=>r.registrationId));
++      if(table_('RegistrationMembers').rows.some(m=>activeIds.has(m.registrationId)&&ids.includes(clean_(m.studentId))))throw new Error('成員已報名本競賽');
++      rec={registrationId:id,eventId:event.eventId,className:clean_(input.className||members[0].className),seatNo:members[0].seatNo,studentName:members[0].studentName,status:'SUBMITTING',requestId:input.requestId,createdAt:stamp,dataOrigin:'USER',demoBatchId:'',schoolId:clean_(event.schoolId||'YLSH'),categoryId:clean_(input.categoryId),registrantEmail:a.email,teamName:clean_(input.teamName),contactPhone:clean_(input.contactPhone),verifiedAt:'',updatedAt:stamp};
++      audit_('REGISTRATION_STARTED',id,{signature:signature,memberCount:members.length},input.requestId,'USER');append_('Registrations',rec);
++    }
++    const present=new Set(table_('RegistrationMembers').rows.filter(m=>m.registrationId===id).map(m=>m.memberId));
++    appendMany_('RegistrationMembers',members.map((m,i)=>Object.assign({},m,{memberId:'MEM-'+id+'-'+(i+1),registrationId:id,role:i===0?'CAPTAIN':'MEMBER',orderNo:i+1,createdAt:rec.createdAt})).filter(m=>!present.has(m.memberId)));
++    const saved=table_('RegistrationMembers').rows.filter(m=>m.registrationId===id);
++    if(saved.length!==members.length)throw new Error('報名成員尚未完整，請使用相同內容重試');
++    audit_('REGISTRATION_CREATED',id,{eventId:event.eventId,members:members.length},input.requestId,'USER');
++    return update_('Registrations','registrationId',id,{status:'REGISTERED',updatedAt:now_()});
++  });});
+ }
++
+ function apiCancelRegistration(id){
+-  return envelope_(function(req){const a=actor_(),r=table_('Registrations').rows.find(x=>x.registrationId===id);if(!r)throw new Error('找不到報名資料');if(!a.isAdmin&&clean_(r.registrantEmail).toLowerCase()!==a.email)throw new Error('沒有取消權限');const out=update_('Registrations','registrationId',id,{status:'CANCELLED',updatedAt:now_()});audit_('REGISTRATION_CANCELLED',id,{},req);return out;});
++  return envelope_(function(req){ return withWriteLock_(function(){const a=actor_(); if(!a.email)throw new Error('請先登入'); const r=table_('Registrations').rows.find(x=>x.registrationId===id);if(!r)throw new Error('找不到報名資料');if(!a.isAdmin&&clean_(r.registrantEmail).toLowerCase()!==a.email)throw new Error('沒有取消權限'); if(r.status==='CHECKED_IN')throw new Error('已檢錄報名不可直接取消');const out=update_('Registrations','registrationId',id,{status:'CANCELLED',updatedAt:now_()});audit_('REGISTRATION_CANCELLED',id,{},req);return out;}); });
+ }
+ 
+ function apiCheckIn(input){
+-  return envelope_(function(req){input=input||{};const r=table_('Registrations').rows.find(x=>x.registrationId===input.registrationId);if(!r)throw new Error('找不到報名資料');const a=canManageEvent_(r.eventId);const prior=table_('CheckIns').rows.find(c=>c.registrationId===r.registrationId&&c.status==='PRESENT');if(prior)return prior;const rec={checkInId:uid_('CHK'),registrationId:r.registrationId,eventId:r.eventId,method:clean_(input.method||'MANUAL'),status:'PRESENT',checkedInAt:now_(),checkerEmail:a.email,requestId:clean_(input.requestId||req),notes:clean_(input.notes)};append_('CheckIns',rec);update_('Registrations','registrationId',r.registrationId,{status:'CHECKED_IN',updatedAt:now_()});audit_('CHECKED_IN',r.registrationId,rec,rec.requestId,'CHECKIN');return rec;});
++  return envelope_(function(req){ return withWriteLock_(function(){input=input||{};const r=table_('Registrations').rows.find(x=>x.registrationId===input.registrationId);if(!r)throw new Error('找不到報名資料');const a=canManageEvent_(r.eventId); if(!eligible_(r))throw new Error('僅已核准報名可檢錄'); const prior=table_('CheckIns').rows.find(c=>c.registrationId===r.registrationId&&c.status==='PRESENT');if(prior){if(r.status!=='CHECKED_IN')update_('Registrations','registrationId',r.registrationId,{status:'CHECKED_IN',updatedAt:now_()});return prior;}const rec={checkInId:uid_('CHK'),registrationId:r.registrationId,eventId:r.eventId,method:clean_(input.method||'MANUAL'),status:'PRESENT',checkedInAt:now_(),checkerEmail:a.email,requestId:clean_(input.requestId||req),notes:clean_(input.notes)};append_('CheckIns',rec);update_('Registrations','registrationId',r.registrationId,{status:'CHECKED_IN',updatedAt:now_()});audit_('CHECKED_IN',r.registrationId,rec,rec.requestId,'CHECKIN');return rec;}); });
+ }
+ 
+ function shuffle_(a){for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));const t=a[i];a[i]=a[j];a[j]=t;}return a;}
+ function apiGenerateDraw(input){
+-  return envelope_(function(req){input=input||{};const a=requireRole_(['SYSTEM_ADMIN','EVENT_ADMIN'],input.eventId);const existing=table_('Draws').rows.filter(d=>d.eventId===input.eventId);if(existing.length)throw new Error('此競賽已有抽籤結果，為避免重複資料已停止操作');const regs=table_('Registrations').rows.filter(r=>r.eventId===input.eventId&&!['CANCELLED','REJECTED','DISQUALIFIED'].includes(r.status));if(!regs.length)throw new Error('沒有可抽籤的報名資料');const stamp=now_(),size=Math.max(2,Number(input.groupSize||8)),shuffled=shuffle_(regs.slice()),out=[];shuffled.forEach((r,i)=>{const d={drawId:uid_('DRW'),eventId:r.eventId,categoryId:r.categoryId,registrationId:r.registrationId,seedNo:i+1,laneNo:(i%size)+1,groupNo:Math.floor(i/size)+1,positionNo:i+1,createdAt:stamp,createdBy:a.email};append_('Draws',d);out.push(d);});audit_('DRAW_GENERATED',input.eventId,{count:out.length,groupSize:size},req);return out;});
++  return envelope_(function(req){return withWriteLock_(function(){
++    input=input||{};const a=requireRole_(['SYSTEM_ADMIN','EVENT_ADMIN'],input.eventId);assertEvent_(input.eventId);
++    const size=Number(input.groupSize||8);if(!Number.isInteger(size)||size<2||size>100)throw new Error('每組人數須為 2–100 的整數');
++    const logs=table_('AuditLogs').rows.filter(l=>l.recordId===input.eventId);
++    if(logs.some(l=>l.action==='DRAW_GENERATED'))throw new Error('此競賽已有抽籤結果，已停止重複產生');
++    const existing=table_('Draws').rows.filter(d=>d.eventId===input.eventId),planned=logs.find(l=>l.action==='DRAW_PLANNED');
++    if(existing.length&&!planned)throw new Error('已有舊版抽籤資料，請管理員先核對');
++    let out;
++    if(planned){const plan=JSON.parse(planned.details);if(plan.groupSize!==size)throw new Error('重試須使用原每組人數');out=plan.rows;}
++    else{
++      const regs=table_('Registrations').rows.filter(r=>r.eventId===input.eventId&&eligible_(r));if(!regs.length)throw new Error('沒有可抽籤的已核准報名資料');
++      const stamp=now_(),groups={};regs.forEach(r=>(groups[r.categoryId||'GENERAL']??=[]).push(r));out=[];
++      Object.keys(groups).sort().forEach(category=>shuffle_(groups[category]).forEach((r,i)=>out.push({drawId:uid_('DRW'),eventId:r.eventId,categoryId:r.categoryId,registrationId:r.registrationId,seedNo:i+1,laneNo:(i%size)+1,groupNo:Math.floor(i/size)+1,positionNo:i+1,createdAt:stamp,createdBy:a.email})));
++      audit_('DRAW_PLANNED',input.eventId,{groupSize:size,rows:out},req);
++    }
++    const ids=new Set(existing.map(d=>d.drawId));appendMany_('Draws',out.filter(d=>!ids.has(d.drawId)));
++    if(table_('Draws').rows.filter(d=>d.eventId===input.eventId).length!==out.length)throw new Error('抽籤資料尚未完整，請使用相同設定重試');
++    audit_('DRAW_GENERATED',input.eventId,{count:out.length,groupSize:size},req);return out;
++  });});
+ }
++
+ function apiListCompetition(eventId){
+-  return envelope_(function(){const events=table_('Events').rows,regs=table_('Registrations').rows,draws=table_('Draws').rows,results=table_('Results').rows,matches=table_('Matches').rows;return {event:events.find(e=>e.eventId===eventId),registrations:regs.filter(r=>r.eventId===eventId),draws:draws.filter(d=>d.eventId===eventId),results:results.filter(r=>r.eventId===eventId),matches:matches.filter(m=>m.eventId===eventId)};});
++  return envelope_(function(){
++    const event=table_('Events').rows.find(e=>e.eventId===eventId&&publicEvent_(e));
++    if(!event)throw new Error('找不到已公開競賽');
++    const regs=table_('Registrations').rows.filter(r=>r.eventId===eventId&&eligible_(r));
++    const ids=new Set(regs.map(r=>r.registrationId));
++    return {event:event,registrations:regs.map(r=>pick_(r,['registrationId','teamName','className'])),
++      draws:table_('Draws').rows.filter(d=>d.eventId===eventId&&ids.has(d.registrationId)).map(d=>pick_(d,['registrationId','groupNo','laneNo','seedNo'])),
++      results:table_('Results').rows.filter(r=>r.eventId===eventId&&ids.has(r.registrationId)&&r.resultStatus==='OFFICIAL').map(r=>pick_(r,['registrationId','rank','score','unit','resultStatus'])),
++      matches:table_('Matches').rows.filter(m=>m.eventId===eventId&&['SCHEDULED','ONGOING','FINISHED'].includes(m.status)).map(m=>pick_(m,['matchId','roundName','matchNo','scheduledAt','venue','sideARegistrationId','sideBRegistrationId','status']))};
++  });
+ }
++
+ function apiSaveResult(input){
+-  return envelope_(function(req){input=input||{};const a=requireRole_(['SYSTEM_ADMIN','EVENT_ADMIN'],input.eventId);if(!input.registrationId)throw new Error('請選擇參賽者');const prior=table_('Results').rows.find(r=>r.eventId===input.eventId&&r.registrationId===input.registrationId);const rec={resultId:prior?prior.resultId:uid_('RES'),eventId:input.eventId,categoryId:clean_(input.categoryId),registrationId:input.registrationId,rank:Number(input.rank||0),score:clean_(input.score),unit:clean_(input.unit),resultStatus:clean_(input.resultStatus||'OFFICIAL'),notes:clean_(input.notes),updatedAt:now_(),updatedBy:a.email};prior?update_('Results','resultId',prior.resultId,rec):append_('Results',rec);audit_('RESULT_SAVED',rec.resultId,rec,req);return rec;});
++  return envelope_(function(req){ return withWriteLock_(function(){input=input||{};const a=requireRole_(['SYSTEM_ADMIN','EVENT_ADMIN'],input.eventId);assertRegistration_(input.eventId,input.registrationId); if(!Number.isInteger(Number(input.rank||0))||Number(input.rank||0)<0)throw new Error('名次格式錯誤'); if(!['OFFICIAL','PROVISIONAL','DQ'].includes(input.resultStatus||'OFFICIAL'))throw new Error('成績狀態錯誤'); const prior=table_('Results').rows.find(r=>r.eventId===input.eventId&&r.registrationId===input.registrationId);const rec={resultId:prior?prior.resultId:uid_('RES'),eventId:input.eventId,categoryId:clean_(input.categoryId),registrationId:input.registrationId,rank:Number(input.rank||0),score:clean_(input.score),unit:clean_(input.unit),resultStatus:clean_(input.resultStatus||'OFFICIAL'),notes:clean_(input.notes),updatedAt:now_(),updatedBy:a.email};prior?update_('Results','resultId',prior.resultId,rec):append_('Results',rec);audit_('RESULT_SAVED',rec.resultId,rec,req);return rec;}); });
+ }
+ function apiSaveRole(input){
+-  return envelope_(function(req){requireRole_(['SYSTEM_ADMIN']);input=input||{};if(!clean_(input.email)||!clean_(input.role))throw new Error('請填寫帳號與角色');const id=clean_(input.assignmentId)||uid_('ROLE'),old=table_('RoleAssignments').rows.find(r=>r.assignmentId===id),stamp=now_(),rec={assignmentId:id,email:clean_(input.email).toLowerCase(),role:clean_(input.role),scopeType:clean_(input.scopeType||'SYSTEM'),scopeId:clean_(input.scopeId||'*'),status:clean_(input.status||'ACTIVE'),createdAt:old?old.createdAt:stamp,updatedAt:stamp};old?update_('RoleAssignments','assignmentId',id,rec):append_('RoleAssignments',rec);audit_('ROLE_SAVED',id,rec,req);return rec;});
++  return envelope_(function(req){ return withWriteLock_(function(){requireRole_(['SYSTEM_ADMIN']);input=input||{};validateRole_(input);const id=clean_(input.assignmentId)||uid_('ROLE'),old=table_('RoleAssignments').rows.find(r=>r.assignmentId===id),stamp=now_(),rec={assignmentId:id,email:clean_(input.email).toLowerCase(),role:clean_(input.role),scopeType:clean_(input.scopeType||'SYSTEM'),scopeId:clean_(input.scopeId||'*'),status:clean_(input.status||'ACTIVE'),createdAt:old?old.createdAt:stamp,updatedAt:stamp};old?update_('RoleAssignments','assignmentId',id,rec):append_('RoleAssignments',rec);audit_('ROLE_SAVED',id,rec,req);return rec;}); });
+ }
+ function apiUpdateRegistrationStatus(input){
+-  return envelope_(function(req){
++  return envelope_(function(req){ return withWriteLock_(function(){
+     input=input||{};const r=table_('Registrations').rows.find(x=>x.registrationId===input.registrationId);if(!r)throw new Error('找不到報名資料');
+     const a=requireRole_(['SYSTEM_ADMIN','EVENT_ADMIN'],r.eventId),allowed=['REGISTERED','APPROVED','REJECTED','CANCELLED','CHECKED_IN','DISQUALIFIED'];
+-    const status=clean_(input.status).toUpperCase();if(!allowed.includes(status))throw new Error('不支援的報名狀態');
++    const status=clean_(input.status).toUpperCase(); if(r.status==='CHECKED_IN'&&status!==r.status)throw new Error('已檢錄資料須另行更正，不可直接重設'); if(status==='CHECKED_IN')throw new Error('請使用現場檢錄功能'); if(!allowed.includes(status))throw new Error('不支援的報名狀態');
+     const out=update_('Registrations','registrationId',r.registrationId,{status:status,verifiedAt:status==='APPROVED'?now_():r.verifiedAt,updatedAt:now_()});
+     audit_('REGISTRATION_STATUS',r.registrationId,{from:r.status,to:status,note:clean_(input.note)},req,a.roles[0]&&a.roles[0].role);return out;
+-  });
++  }); });
+ }
+ function apiSaveSettings(input){
+-  return envelope_(function(req){
++  return envelope_(function(req){ return withWriteLock_(function(){
+     requireRole_(['SYSTEM_ADMIN']);input=input||{};const values={schoolName:clean_(input.schoolName),themeColor:clean_(input.themeColor)};
+     if(!values.schoolName)throw new Error('請輸入學校名稱');if(!/^#[0-9a-fA-F]{6}$/.test(values.themeColor))throw new Error('主題色格式不正確');
+     Object.keys(values).forEach(k=>{const old=table_('Settings').rows.find(r=>r.key===k);old?update_('Settings','key',k,{value:values[k],updatedAt:now_()}):append_('Settings',{key:k,value:values[k],updatedAt:now_()});});
+     audit_('SETTINGS_SAVED','SYSTEM',values,req,'SYSTEM_ADMIN');return values;
+-  });
++  }); });
+ }
+ function apiSaveMatch(input){
+-  return envelope_(function(req){
++  return envelope_(function(req){ return withWriteLock_(function(){
+     input=input||{};const a=requireRole_(['SYSTEM_ADMIN','EVENT_ADMIN'],input.eventId);if(!clean_(input.eventId)||!clean_(input.roundName))throw new Error('請選擇競賽並輸入賽程輪次');
+-    const id=clean_(input.matchId)||uid_('MAT'),old=table_('Matches').rows.find(r=>r.matchId===id),rec={matchId:id,eventId:clean_(input.eventId),categoryId:clean_(input.categoryId),roundName:clean_(input.roundName),matchNo:clean_(input.matchNo),scheduledAt:clean_(input.scheduledAt),venue:clean_(input.venue),sideARegistrationId:clean_(input.sideARegistrationId),sideBRegistrationId:clean_(input.sideBRegistrationId),status:clean_(input.status||'SCHEDULED'),winnerRegistrationId:clean_(input.winnerRegistrationId),scoreA:clean_(input.scoreA),scoreB:clean_(input.scoreB),updatedAt:now_()};
++    if(!['DRAFT','SCHEDULED','ONGOING','FINISHED','CANCELLED'].includes(input.status||'SCHEDULED'))throw new Error('賽程狀態錯誤'); assertEvent_(input.eventId); if(input.matchId&&!validId_(input.matchId))throw new Error('賽程編號錯誤'); dateMs_(input.scheduledAt); validateMatchSides_(input); const id=clean_(input.matchId)||requestEntityId_('MAT',input.requestId),old=table_('Matches').rows.find(r=>r.matchId===id); if(old)requireRole_(['SYSTEM_ADMIN','EVENT_ADMIN'],old.eventId); if(!input.matchId&&old){if(old.eventId!==input.eventId)throw new Error('請求識別碼衝突');return old;} const rec={matchId:id,eventId:clean_(input.eventId),categoryId:clean_(input.categoryId),roundName:clean_(input.roundName),matchNo:clean_(input.matchNo),scheduledAt:clean_(input.scheduledAt),venue:clean_(input.venue),sideARegistrationId:clean_(input.sideARegistrationId),sideBRegistrationId:clean_(input.sideBRegistrationId),status:clean_(input.status||'SCHEDULED'),winnerRegistrationId:clean_(input.winnerRegistrationId),scoreA:clean_(input.scoreA),scoreB:clean_(input.scoreB),updatedAt:now_()};
+     old?update_('Matches','matchId',id,rec):append_('Matches',rec);audit_('MATCH_SAVED',id,rec,req,a.roles[0]&&a.roles[0].role);return rec;
+-  });
++  }); });
+ }
+ function apiAdminModel(){
+-  return envelope_(function(){const actor=requireRole_(['SYSTEM_ADMIN','EVENT_ADMIN','CHECKIN','CLASS_ADMIN']);return {build:BUILD,actor:actor,settings:settingMap_(),events:table_('Events').rows.filter(r=>r.status!=='DELETED'),categories:table_('Categories').rows.filter(r=>r.status!=='DELETED'),registrations:table_('Registrations').rows,members:table_('RegistrationMembers').rows,checkIns:table_('CheckIns').rows,draws:table_('Draws').rows,matches:table_('Matches').rows,results:table_('Results').rows,roles:table_('RoleAssignments').rows,auditLogs:table_('AuditLogs').rows.slice(-80).reverse()};});
++  return envelope_(function(){
++    const actor=requireRole_(['SYSTEM_ADMIN','EVENT_ADMIN','CHECKIN','CLASS_ADMIN'],'@MODEL');
++    const allRegs=table_('Registrations').rows;
++    const canEvent=id=>actor.roles.some(r=>roleAllows_(r,['SYSTEM_ADMIN','EVENT_ADMIN','CHECKIN'],id));
++    const regs=allRegs.filter(r=>canEvent(r.eventId)||actor.roles.some(x=>x.role==='CLASS_ADMIN'&&x.scopeType==='CLASS'&&x.scopeId===r.className));
++    const regIds=new Set(regs.map(r=>r.registrationId));
++    const events=table_('Events').rows.filter(e=>e.status!=='DELETED'&&(canEvent(e.eventId)||regs.some(r=>r.eventId===e.eventId)));
++    const eventIds=new Set(events.map(e=>e.eventId));
++    return {navigation:navigation_(),build:BUILD,actor:actor,settings:actor.isAdmin?settingMap_():publicSettings_(),events:events,
++      categories:table_('Categories').rows.filter(c=>eventIds.has(c.eventId)&&c.status!=='DELETED'),
++      registrations:regs,members:table_('RegistrationMembers').rows.filter(m=>regIds.has(m.registrationId)),
++      checkIns:table_('CheckIns').rows.filter(c=>regIds.has(c.registrationId)),draws:table_('Draws').rows.filter(d=>regIds.has(d.registrationId)),
++      matches:table_('Matches').rows.filter(m=>canEvent(m.eventId)),results:table_('Results').rows.filter(r=>regIds.has(r.registrationId)),
++      roles:actor.isAdmin?table_('RoleAssignments').rows:[],auditLogs:actor.isAdmin?table_('AuditLogs').rows.slice(-80).reverse():[]};
++  });
++}
++
++function pick_(row,keys){const out={};keys.forEach(k=>{if(row[k]!==undefined)out[k]=row[k];});return out;}
++function publicEvent_(e){return ['OPEN','CLOSED','ONGOING','FINISHED'].includes(e.status);}
++function publicSettings_(){return pick_(settingMap_(),['schoolName','themeColor']);}
++function eligible_(r){return ['APPROVED','CHECKED_IN'].includes(r.status);}
++function roleAllows_(r,allowed,id){
++  if(!allowed.includes(r.role))return false;
++  if(r.role==='SYSTEM_ADMIN')return r.scopeType==='SYSTEM'&&r.scopeId==='*';
++  if(id==='@MODEL')return true;
++  if(!id)return r.scopeType==='SYSTEM'&&r.scopeId==='*';
++  return (r.scopeType==='SYSTEM'&&r.scopeId==='*')||(r.scopeType==='EVENT'&&r.scopeId===id);
++}
++function requireSystemAdmin_(){
++  const email=clean_(Session.getActiveUser().getEmail()).toLowerCase(),admin=clean_(PropertiesService.getScriptProperties().getProperty(ADMIN_PROP)).toLowerCase();
++  if(!email||!admin||email!==admin)throw new Error('僅系統主管可安裝或升級');
++}
++function withWriteLock_(fn){const lock=LockService.getScriptLock();lock.waitLock(20000);try{return fn();}finally{lock.releaseLock();}}
++function assertEvent_(id){const e=table_('Events').rows.find(e=>e.eventId===id&&e.status!=='DELETED');if(!e)throw new Error('找不到競賽');return e;}
++function assertRegistration_(eventId,id){assertEvent_(eventId);const r=table_('Registrations').rows.find(r=>r.eventId===eventId&&r.registrationId===id&&eligible_(r));if(!r)throw new Error('參賽者不屬於本競賽或尚未核准');return r;}
++function dateMs_(value){const v=clean_(value);if(!v)return 0;const local=/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2})?$/.test(v)?v+'+08:00':v;const t=Date.parse(local);if(!Number.isFinite(t))throw new Error('日期格式錯誤');return t;}
++function validateMatchSides_(input){if(input.sideARegistrationId===input.sideBRegistrationId&&input.sideARegistrationId)throw new Error('對戰雙方不能相同');['sideARegistrationId','sideBRegistrationId','winnerRegistrationId'].forEach(k=>{if(input[k])assertRegistration_(input.eventId,input[k]);});if(input.winnerRegistrationId&&![input.sideARegistrationId,input.sideBRegistrationId].includes(input.winnerRegistrationId))throw new Error('勝方必須是對戰其中一方');}
++function validateRole_(input){
++ if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(clean_(input.email)))throw new Error('帳號格式錯誤');
++ if(!['EVENT_ADMIN','CHECKIN','CLASS_ADMIN'].includes(input.role))throw new Error('不支援的角色');
++ if(!['ACTIVE','INACTIVE'].includes(input.status||'ACTIVE'))throw new Error('權限狀態錯誤');
++ const type=input.scopeType||'SYSTEM',id=clean_(input.scopeId||'*');
++ if(input.role==='CLASS_ADMIN'){if(type!=='CLASS'||id==='*'||!id)throw new Error('班級管理員必須指定班級');}
++ else if(type==='EVENT'){assertEvent_(id);}else if(type!=='SYSTEM'||id!=='*')throw new Error('權限範圍錯誤');
+ }
++
++function validId_(id){return /^[A-Za-z0-9_-]{1,100}$/.test(clean_(id));}
++function validateEventInput_(input){
++ if(input.eventId&&!validId_(input.eventId))throw new Error('競賽編號錯誤');
++ if(input.status&&!['DRAFT','OPEN','CLOSED','ONGOING','FINISHED'].includes(input.status))throw new Error('競賽狀態錯誤');
++ if(input.eventType&&!['INDIVIDUAL','TEAM','RELAY','BALL','FUN'].includes(input.eventType))throw new Error('競賽類型錯誤');
++ const old=input.eventId?table_('Events').rows.find(e=>e.eventId===input.eventId):null,merged=Object.assign({},old||{},input);
++ const min=Number(merged.teamMin||1),max=Number(merged.teamMax||min),cap=Number(merged.capacity||0);
++ if(!Number.isInteger(min)||!Number.isInteger(max)||min<1||max<min||max>100||!Number.isInteger(cap)||cap<0)throw new Error('人數或名額格式錯誤');
++ const start=dateMs_(merged.registrationOpenAt),end=dateMs_(merged.registrationCloseAt); dateMs_(merged.eventDate);
++ if(start&&end&&end<=start)throw new Error('截止時間須晚於開始時間');
++}
++
++function navigation_(){const url=ScriptApp.getService().getUrl();return {registration:url,admin:url+'?view=admin'};}
++
++function requestEntityId_(prefix,id){if(!/^[A-Za-z0-9_-]{8,80}$/.test(clean_(id)))throw new Error('請使用新版頁面重新送出，缺少請求識別碼');return prefix+'-'+id;}
++
++function appendMany_(name,objects){if(!objects.length)return;const t=table_(name);t.sheet.getRange(t.sheet.getLastRow()+1,1,objects.length,t.headers.length).setValues(objects.map(o=>mapRow_(t.headers,o)));}
++function payloadHash_(value){return Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256,JSON.stringify(value),Utilities.Charset.UTF_8).map(b=>('0'+((b+256)%256).toString(16)).slice(-2)).join('');}

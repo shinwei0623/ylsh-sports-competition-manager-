@@ -1,0 +1,7 @@
+[
+  {"decision":"Preserve and recover existing integrated app; do not rebuild from scaffold","source":"user request"},
+  {"decision":"Keep root scaffold and workflows intact; use gas/integrated as explicit app root","reason":"avoid mixing old demo cleanup APIs with integrated backend"},
+  {"decision":"No OAuth auto-deployment setup; no changes to existing website/data without scoped approval","source":"user request"},
+  {"decision":"Require studentId for new registrations; public labels omit student identities","reason":"reliable duplicate identity and minimum public data"},
+  {"decision":"Keep local TEST manifest DOMAIN and preserve live audience until separately authorized","reason":"separate test configuration from current deployment"}
+]
