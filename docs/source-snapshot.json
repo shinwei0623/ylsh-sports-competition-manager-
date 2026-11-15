@@ -1,0 +1,27 @@
+{
+  "source": "Apps Script editor clipboard read only",
+  "build": "INTEGRATED-2.0.0",
+  "captured_at": "2026-11-16 Asia/Taipei",
+  "files": {
+    "Code.gs": {
+      "characters": 18977,
+      "sha256": "e802439c892eb28e4ff3314a746bf8cfaa34b6a6ab968b7d08eee01af3601a98"
+    },
+    "Index.html": {
+      "characters": 12847,
+      "sha256": "d90e16a0e7820874ed6ca8a448087fd3bdea085e778f0d7cacfe7f90a8ef15cc"
+    },
+    "Admin.html": {
+      "characters": 26282,
+      "sha256": "c96cdc49e1b173d91bd8b41ee31ffad279219452d5ad40cb07d4f6e8302bda11"
+    },
+    "appsscript.json": {
+      "characters": 193,
+      "sha256": "988b476f96343d1846826a2e2f665db59edfdd57aa488f92a36f6b1a20f33946"
+    }
+  },
+  "live_deployment_version": 3,
+  "live_access": "signed-in Google users",
+  "source_to_deployed_bytes": "pending immutable version comparison",
+  "student_data_exported": false
+}
