@@ -203,3 +203,11 @@ test('blank student IDs are rejected and draft match/score fields stay private',
  s.good('apiSaveMatch',{requestId:'open-match-0001',eventId:'E1',roundName:'Final',status:'SCHEDULED',scoreA:'PRIVATE_SCORE'});
  const c=s.good('apiListCompetition','E1');assert.equal(c.matches.length,1);assert.ok(!JSON.stringify(c).includes('PRIVATE_SCORE'));
 });
+
+test('incomplete registration cannot be approved or drawn before recovery',()=>{
+ const s=system();s.event();s.login('student@example.test');s.failNext('RegistrationMembers');s.bad('apiSubmitRegistration',s.input());
+ const id=s.rows('Registrations')[0].registrationId;s.login('owner@example.test');
+ for(const status of ['APPROVED','REGISTERED','CHECKED_IN'])s.bad('apiUpdateRegistrationStatus',{registrationId:id,status});
+ s.bad('apiGenerateDraw',{eventId:'E1'});s.bad('apiCheckIn',{registrationId:id});assert.equal(s.rows('Draws').length,0);
+ s.login('student@example.test');s.good('apiSubmitRegistration',s.input());s.login('owner@example.test');s.good('apiUpdateRegistrationStatus',{registrationId:id,status:'APPROVED'});assert.equal(s.good('apiGenerateDraw',{eventId:'E1'}).length,1);
+});

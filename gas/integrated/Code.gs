@@ -220,7 +220,7 @@ function apiUpdateRegistrationStatus(input){
   return envelope_(function(req){ return withWriteLock_(function(){
     input=input||{};const r=table_('Registrations').rows.find(x=>x.registrationId===input.registrationId);if(!r)throw new Error('找不到報名資料');
     const a=requireRole_(['SYSTEM_ADMIN','EVENT_ADMIN'],r.eventId),allowed=['REGISTERED','APPROVED','REJECTED','CANCELLED','CHECKED_IN','DISQUALIFIED'];
-    const status=clean_(input.status).toUpperCase(); if(r.status==='CHECKED_IN'&&status!==r.status)throw new Error('已檢錄資料須另行更正，不可直接重設'); if(status==='CHECKED_IN')throw new Error('請使用現場檢錄功能'); if(!allowed.includes(status))throw new Error('不支援的報名狀態');
+    if(r.status==='SUBMITTING')throw new Error('報名尚未完成，請以原請求復原或由報名者取消'); const status=clean_(input.status).toUpperCase(); if(r.status==='CHECKED_IN'&&status!==r.status)throw new Error('已檢錄資料須另行更正，不可直接重設'); if(status==='CHECKED_IN')throw new Error('請使用現場檢錄功能'); if(!allowed.includes(status))throw new Error('不支援的報名狀態');
     const out=update_('Registrations','registrationId',r.registrationId,{status:status,verifiedAt:status==='APPROVED'?now_():r.verifiedAt,updatedAt:now_()});
     audit_('REGISTRATION_STATUS',r.registrationId,{from:r.status,to:status,note:clean_(input.note)},req,a.roles[0]&&a.roles[0].role);return out;
   }); });
