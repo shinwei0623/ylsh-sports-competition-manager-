@@ -1,5 +1,5 @@
 /** TEST-only event definitions; adds columns but never removes existing data. */
-const SPORT_EVENT_EXTRA=['meetId','division','eventType','competitionDate','startTime','venue','perClassLimit','registrationDeadline'];
+const SPORT_EVENT_EXTRA=['meetId','division','perClassLimit'];
 function setupSportEventColumns(){
  const book=sportP1Admin_(),lock=LockService.getScriptLock();lock.waitLock(20000);
  try{
@@ -31,11 +31,10 @@ function createSportEvent(input){
   if(perClassLimit>capacity)throw Error('Per-class limit exceeds capacity');
   const deadline=input.registrationDeadline?sportP1Date_(input.registrationDeadline):'';
   if(deadline&&deadline>day)throw Error('Deadline after event');
-  const time=String(input.startTime||'');
-  if(time&&!/^([01]\d|2[0-3]):[0-5]\d$/.test(time))throw Error('Invalid start time');
+
   const s=b.getSheetByName('Events'),h=s.getRange(1,1,1,s.getLastColumn()).getValues()[0].map(String);
   if(SPORT_EVENT_EXTRA.some(k=>!h.includes(k)))throw Error('Run setupSportEventColumns');
-  const record={eventId:Utilities.getUuid(),meetId:String(meet.meetId),name:clean(input.name,100),category:clean(input.category,50),division:clean(input.division,60),eventType:type,competitionDate:day,startTime:time,venue:clean(input.venue,80),capacity,perClassLimit,registrationDeadline:deadline,status:'DRAFT',createdAt:new Date().toISOString()};
+  const record={eventId:Utilities.getUuid(),meetId:String(meet.meetId),name:clean(input.name,100),category:clean(input.category,50),division:clean(input.division,60),eventType:type,eventDate:day,venue:clean(input.venue,80),capacity,perClassLimit,registrationCloseAt:deadline,status:'DRAFT',createdAt:new Date().toISOString()};
   s.appendRow(h.map(k=>Object.prototype.hasOwnProperty.call(record,k)?record[k]:''));return record;
  }finally{lock.releaseLock()}
 }
