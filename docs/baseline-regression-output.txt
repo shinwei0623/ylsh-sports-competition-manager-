@@ -1,0 +1,550 @@
+✔ full isolated API flow: create, submit, approve, check-in, draw, schedule, result, public read (11.890516ms)
+✖ public competition DTO omits private contact, email, student identity and request ID (5.054025ms)
+✖ anonymous bootstrap never matches legacy records with blank owner (3.709606ms)
+✖ bootstrap limits settings and check-in rows to current user (3.514815ms)
+✖ scoped event manager cannot edit another event or create global events (2.796191ms)
+✖ scoped manager model filters registrations, members, audit and assignments (2.705301ms)
+✖ class manager sees only assigned class and cannot grant roles (2.282072ms)
+✖ unprivileged caller cannot run schema installer (2.495048ms)
+✖ registration idempotency is checked after acquiring the write lock (6.568518ms)
+✖ request ID collision cannot return another user registration (3.365859ms)
+✔ retries reuse the original record and do not duplicate members (1.889109ms)
+✖ registration rejects closed, future, expired or malformed dates (3.294846ms)
+✖ registration capacity and member limits are enforced (1.954332ms)
+✖ foreign or closed category is rejected (2.152458ms)
+✖ duplicate student IDs rejected within one team and across active entries (1.826449ms)
+✖ pending, cancelled and rejected registrations cannot check in or enter a draw (1.812338ms)
+✔ check-in role cannot check another event or save results (2.357436ms)
+✖ draw locks writes and prevents regeneration (9.494299ms)
+✖ draft competition, provisional results and private results metadata stay hidden (2.646943ms)
+✖ match and result relations cannot refer to another event or same opponent (4.592937ms)
+✖ cannot reparent another managers existing category or match (3.395965ms)
+✖ event edit preserves capacity and scoring fields absent from the form (5.400877ms)
+✖ invalid event IDs, roles, dates and ranges fail closed (5.00222ms)
+✖ checked-in registrations cannot be cancelled or silently reset (3.291734ms)
+✖ Taipei datetime-local input is independent of test host timezone (2.371854ms)
+✔ frontends compile; every google.script.run API exists; navigation and print output render safely (34.367844ms)
+ℹ tests 26
+ℹ suites 0
+ℹ pass 4
+ℹ fail 22
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 495.97228
+
+✖ failing tests:
+
+test at tests/integrated.test.mjs:62:1
+✖ public competition DTO omits private contact, email, student identity and request ID (5.054025ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
+  + actual - expected
+  
+    [
+  +   '_row',
+  +   'categoryId',
+      'className',
+  +   'contactPhone',
+  +   'createdAt',
+  +   'dataOrigin',
+  +   'demoBatchId',
+  +   'eventId',
+  +   'registrantEmail',
+      'registrationId',
+  +   'requestId',
+  +   'schoolId',
+  +   'seatNo',
+  +   'status',
+  +   'studentName',
+      'teamName',
+  +   'updatedAt',
+  +   'verifiedAt'
+    ]
+  
+      at TestContext.<anonymous> (file:///workspace/scratch/92023e018ecc/sports-sync/tests/integrated.test.mjs:65:9)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: [
+      '_row',            'categoryId',
+      'className',       'contactPhone',
+      'createdAt',       'dataOrigin',
+      'demoBatchId',     'eventId',
+      'registrantEmail', 'registrationId',
+      'requestId',       'schoolId',
+      'seatNo',          'status',
+      'studentName',     'teamName',
+      'updatedAt',       'verifiedAt'
+    ],
+    expected: [ 'className', 'registrationId', 'teamName' ],
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }
+
+test at tests/integrated.test.mjs:68:1
+✖ anonymous bootstrap never matches legacy records with blank owner (3.709606ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  1 !== 0
+  
+      at TestContext.<anonymous> (file:///workspace/scratch/92023e018ecc/sports-sync/tests/integrated.test.mjs:70:9)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 1,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at tests/integrated.test.mjs:72:1
+✖ bootstrap limits settings and check-in rows to current user (3.514815ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
+  + actual - expected
+  
+  + [
+  +   {
+  +     _row: 2,
+  +     checkInId: '',
+  +     checkedInAt: '',
+  +     checkerEmail: 'staff@example.test',
+  +     eventId: 'E1',
+  +     method: '',
+  +     notes: '',
+  +     registrationId: 'R1',
+  +     requestId: '',
+  +     status: 'PRESENT'
+  +   }
+  + ]
+  - []
+  
+      at TestContext.<anonymous> (file:///workspace/scratch/92023e018ecc/sports-sync/tests/integrated.test.mjs:75:70)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: [ { _row: 2, checkInId: '', registrationId: 'R1', eventId: 'E1', method: '', status: 'PRESENT', checkedInAt: '', checkerEmail: 'staff@example.test', requestId: '', notes: '' } ],
+    expected: [],
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }
+
+test at tests/integrated.test.mjs:77:1
+✖ scoped event manager cannot edit another event or create global events (2.796191ms)
+  AssertionError [ERR_ASSERTION]: apiSaveEvent unexpectedly allowed
+  
+  true !== false
+  
+      at Object.bad (file:///workspace/scratch/92023e018ecc/sports-sync/tests/integrated.test.mjs:37:63)
+      at TestContext.<anonymous> (file:///workspace/scratch/92023e018ecc/sports-sync/tests/integrated.test.mjs:79:4)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: true,
+    expected: false,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at tests/integrated.test.mjs:82:1
+✖ scoped manager model filters registrations, members, audit and assignments (2.705301ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
+  + actual - expected
+  
+    [
+      'E1',
+  +   'E2'
+    ]
+  
+      at TestContext.<anonymous> (file:///workspace/scratch/92023e018ecc/sports-sync/tests/integrated.test.mjs:86:41)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: [ 'E1', 'E2' ],
+    expected: [ 'E1' ],
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }
+
+test at tests/integrated.test.mjs:88:1
+✖ class manager sees only assigned class and cannot grant roles (2.282072ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  2 !== 1
+  
+      at TestContext.<anonymous> (file:///workspace/scratch/92023e018ecc/sports-sync/tests/integrated.test.mjs:90:77)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 2,
+    expected: 1,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at tests/integrated.test.mjs:93:1
+✖ unprivileged caller cannot run schema installer (2.495048ms)
+  AssertionError [ERR_ASSERTION]: installOrUpgradeSystem unexpectedly allowed
+  
+  true !== false
+  
+      at Object.bad (file:///workspace/scratch/92023e018ecc/sports-sync/tests/integrated.test.mjs:37:63)
+      at TestContext.<anonymous> (file:///workspace/scratch/92023e018ecc/sports-sync/tests/integrated.test.mjs:94:53)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: true,
+    expected: false,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at tests/integrated.test.mjs:96:1
+✖ registration idempotency is checked after acquiring the write lock (6.568518ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  'REG-2' !== 'R-race'
+  
+      at TestContext.<anonymous> (file:///workspace/scratch/92023e018ecc/sports-sync/tests/integrated.test.mjs:99:9)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'REG-2',
+    expected: 'R-race',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at tests/integrated.test.mjs:101:1
+✖ request ID collision cannot return another user registration (3.365859ms)
+  AssertionError [ERR_ASSERTION]: apiSubmitRegistration unexpectedly allowed
+  
+  true !== false
+  
+      at Object.bad (file:///workspace/scratch/92023e018ecc/sports-sync/tests/integrated.test.mjs:37:63)
+      at TestContext.<anonymous> (file:///workspace/scratch/92023e018ecc/sports-sync/tests/integrated.test.mjs:102:105)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: true,
+    expected: false,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at tests/integrated.test.mjs:108:1
+✖ registration rejects closed, future, expired or malformed dates (3.294846ms)
+  AssertionError [ERR_ASSERTION]: apiSubmitRegistration unexpectedly allowed
+  
+  true !== false
+  
+      at Object.bad (file:///workspace/scratch/92023e018ecc/sports-sync/tests/integrated.test.mjs:37:63)
+      at TestContext.<anonymous> (file:///workspace/scratch/92023e018ecc/sports-sync/tests/integrated.test.mjs:110:74)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: true,
+    expected: false,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at tests/integrated.test.mjs:113:1
+✖ registration capacity and member limits are enforced (1.954332ms)
+  AssertionError [ERR_ASSERTION]: apiSubmitRegistration unexpectedly allowed
+  
+  true !== false
+  
+      at Object.bad (file:///workspace/scratch/92023e018ecc/sports-sync/tests/integrated.test.mjs:37:63)
+      at TestContext.<anonymous> (file:///workspace/scratch/92023e018ecc/sports-sync/tests/integrated.test.mjs:114:88)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: true,
+    expected: false,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at tests/integrated.test.mjs:117:1
+✖ foreign or closed category is rejected (2.152458ms)
+  AssertionError [ERR_ASSERTION]: apiSubmitRegistration unexpectedly allowed
+  
+  true !== false
+  
+      at Object.bad (file:///workspace/scratch/92023e018ecc/sports-sync/tests/integrated.test.mjs:37:63)
+      at TestContext.<anonymous> (file:///workspace/scratch/92023e018ecc/sports-sync/tests/integrated.test.mjs:118:128)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: true,
+    expected: false,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at tests/integrated.test.mjs:120:1
+✖ duplicate student IDs rejected within one team and across active entries (1.826449ms)
+  AssertionError [ERR_ASSERTION]: apiSubmitRegistration unexpectedly allowed
+  
+  true !== false
+  
+      at Object.bad (file:///workspace/scratch/92023e018ecc/sports-sync/tests/integrated.test.mjs:37:63)
+      at TestContext.<anonymous> (file:///workspace/scratch/92023e018ecc/sports-sync/tests/integrated.test.mjs:121:108)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: true,
+    expected: false,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at tests/integrated.test.mjs:124:1
+✖ pending, cancelled and rejected registrations cannot check in or enter a draw (1.812338ms)
+  AssertionError [ERR_ASSERTION]: apiCheckIn unexpectedly allowed
+  
+  true !== false
+  
+      at Object.bad (file:///workspace/scratch/92023e018ecc/sports-sync/tests/integrated.test.mjs:37:63)
+      at TestContext.<anonymous> (file:///workspace/scratch/92023e018ecc/sports-sync/tests/integrated.test.mjs:125:131)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: true,
+    expected: false,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at tests/integrated.test.mjs:131:1
+✖ draw locks writes and prevents regeneration (9.494299ms)
+  AssertionError [ERR_ASSERTION]: The expression evaluated to a falsy value:
+  
+    assert.ok(s.writes.filter(x=>x.name==='Draws').every(x=>x.locked))
+  
+      at TestContext.<anonymous> (file:///workspace/scratch/92023e018ecc/sports-sync/tests/integrated.test.mjs:132:164)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at tests/integrated.test.mjs:134:1
+✖ draft competition, provisional results and private results metadata stay hidden (2.646943ms)
+  AssertionError [ERR_ASSERTION]: apiListCompetition unexpectedly allowed
+  
+  true !== false
+  
+      at Object.bad (file:///workspace/scratch/92023e018ecc/sports-sync/tests/integrated.test.mjs:37:63)
+      at TestContext.<anonymous> (file:///workspace/scratch/92023e018ecc/sports-sync/tests/integrated.test.mjs:135:52)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: true,
+    expected: false,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at tests/integrated.test.mjs:138:1
+✖ match and result relations cannot refer to another event or same opponent (4.592937ms)
+  AssertionError [ERR_ASSERTION]: apiSaveResult unexpectedly allowed
+  
+  true !== false
+  
+      at Object.bad (file:///workspace/scratch/92023e018ecc/sports-sync/tests/integrated.test.mjs:37:63)
+      at TestContext.<anonymous> (file:///workspace/scratch/92023e018ecc/sports-sync/tests/integrated.test.mjs:139:66)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: true,
+    expected: false,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at tests/integrated.test.mjs:142:1
+✖ cannot reparent another managers existing category or match (3.395965ms)
+  AssertionError [ERR_ASSERTION]: apiSaveCategory unexpectedly allowed
+  
+  true !== false
+  
+      at Object.bad (file:///workspace/scratch/92023e018ecc/sports-sync/tests/integrated.test.mjs:37:63)
+      at TestContext.<anonymous> (file:///workspace/scratch/92023e018ecc/sports-sync/tests/integrated.test.mjs:144:71)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: true,
+    expected: false,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at tests/integrated.test.mjs:146:1
+✖ event edit preserves capacity and scoring fields absent from the form (5.400877ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  0 !== 3
+  
+      at TestContext.<anonymous> (file:///workspace/scratch/92023e018ecc/sports-sync/tests/integrated.test.mjs:147:138)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 0,
+    expected: 3,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at tests/integrated.test.mjs:149:1
+✖ invalid event IDs, roles, dates and ranges fail closed (5.00222ms)
+  AssertionError [ERR_ASSERTION]: apiSaveEvent unexpectedly allowed
+  
+  true !== false
+  
+      at Object.bad (file:///workspace/scratch/92023e018ecc/sports-sync/tests/integrated.test.mjs:37:63)
+      at TestContext.<anonymous> (file:///workspace/scratch/92023e018ecc/sports-sync/tests/integrated.test.mjs:150:122)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: true,
+    expected: false,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at tests/integrated.test.mjs:153:1
+✖ checked-in registrations cannot be cancelled or silently reset (3.291734ms)
+  AssertionError [ERR_ASSERTION]: apiCancelRegistration unexpectedly allowed
+  
+  true !== false
+  
+      at Object.bad (file:///workspace/scratch/92023e018ecc/sports-sync/tests/integrated.test.mjs:37:63)
+      at TestContext.<anonymous> (file:///workspace/scratch/92023e018ecc/sports-sync/tests/integrated.test.mjs:154:70)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: true,
+    expected: false,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at tests/integrated.test.mjs:156:1
+✖ Taipei datetime-local input is independent of test host timezone (2.371854ms)
+  TypeError [Error]: s.ctx.dateMs_ is not a function
+      at TestContext.<anonymous> (file:///workspace/scratch/92023e018ecc/sports-sync/tests/integrated.test.mjs:157:38)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
